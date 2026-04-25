@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YouTube Transcript</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, sans-serif;
+      background: #f5f5f5;
+      color: #1a1a1a;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 1.5rem;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 0.5rem;
+      width: 100%;
+      max-width: 640px;
+      margin-bottom: 1.5rem;
+    }
+
+    input {
+      flex: 1;
+      padding: 0.6rem 0.8rem;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 1rem;
+    }
+
+    button {
+      padding: 0.6rem 1.2rem;
+      background: #1a1a1a;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 1rem;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    button:disabled { opacity: 0.5; cursor: default; }
+
+    #status {
+      font-size: 0.9rem;
+      color: #666;
+      margin-bottom: 1rem;
+    }
+
+    #status.error { color: #c00; }
+
+    #transcript {
+      width: 100%;
+      max-width: 640px;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 1rem;
+      display: none;
+    }
+
+    .toolbar {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 0.75rem;
+    }
+
+    .copy-btn {
+      padding: 0.3rem 0.8rem;
+      font-size: 0.85rem;
+      background: #f0f0f0;
+      color: #1a1a1a;
+      border: 1px solid #ccc;
+    }
+
+    .entry {
+      display: flex;
+      gap: 0.75rem;
+      padding: 0.25rem 0;
+      line-height: 1.5;
+      font-size: 0.95rem;
+    }
+
+    .time {
+      color: #888;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      flex-shrink: 0;
+      font-size: 0.85rem;
+      padding-top: 0.1rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>YouTube Transcript</h1>
+
+  <div class="input-row">
+    <input id="url" type="text" placeholder="Paste a YouTube URL…" />
+    <button id="fetchBtn" onclick="fetchTranscript()">Get Transcript</button>
+  </div>
+
+  <div id="status"></div>
+
+  <div id="transcript">
+    <div class="toolbar">
+      <button class="copy-btn" onclick="copyTranscript()">Copy</button>
+    </div>
+    <div id="entries"></div>
+  </div>
+
+  <script>
+    const API = "https://your-project.vercel.app/api/fetch";
+
+    async function fetchTranscript() {
+      const url = document.getElementById("url").value.trim();
+      const btn = document.getElementById("fetchBtn");
+      const status = document.getElementById("status");
+      const box = document.getElementById("transcript");
+      const entries = document.getElementById("entries");
+
+      if (!url) return;
+
+      btn.disabled = true;
+      status.className = "";
+      status.textContent = "Fetching transcript…";
+      box.style.display = "none";
+      entries.innerHTML = "";
+
+      try {
+        const res = await fetch(`${API}?url=${encodeURIComponent(url)}`);
+        const data = await res.json();
+
+        if (!res.ok) {
+          status.className = "error";
+          status.textContent = data.error || "Something went wrong.";
+          return;
+        }
+
+        status.textContent = `${data.entries.length} entries`;
+        box.style.display = "block";
+        entries.innerHTML = data.entries.map(e => `
+          <div class="entry">
+            <span class="time">[${e.time}]</span>
+            <span>${e.text}</span>
+          </div>
+        `).join("");
+      } catch (err) {
+        status.className = "error";
+        status.textContent = "Network error — is the API deployed?";
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function copyTranscript() {
+      const entries = document.querySelectorAll(".entry");
+      const text = Array.from(entries)
+        .map(e => `[${e.querySelector(".time").textContent.slice(1, -1)}] ${e.querySelector("span:last-child").textContent}`)
+        .join("\n");
+      navigator.clipboard.writeText(text);
+    }
+
+    document.getElementById("url").addEventListener("keydown", e => {
+      if (e.key === "Enter") fetchTranscript();
+    });
+  </script>
+</body>
+</html>
