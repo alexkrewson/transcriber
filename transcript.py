@@ -1,9 +1,19 @@
 #!/usr/bin/env python3
+import logging
 import os
 import re
 import subprocess
 import sys
+from datetime import datetime
 from youtube_transcript_api import YouTubeTranscriptApi, NoTranscriptFound, TranscriptsDisabled
+
+os.makedirs("transcriptions", exist_ok=True)
+logging.basicConfig(
+    filename=os.path.join("transcriptions", "errors.log"),
+    level=logging.ERROR,
+    format="%(asctime)s %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
 
 
 def extract_video_id(url: str) -> str:
@@ -66,13 +76,15 @@ def main():
     try:
         video_id = extract_video_id(url)
     except ValueError as e:
+        logging.error("Bad URL %s — %s", url, e)
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
 
     try:
         text = fetch_transcript(video_id)
         print(text)
-        filename = f"transcript_{video_id}.txt"
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        filename = os.path.join("transcriptions", f"transcript_{video_id}_{timestamp}.txt")
         with open(filename, "w") as f:
             f.write(text)
         print(f"Saved to {filename}", file=sys.stderr)
@@ -82,14 +94,17 @@ def main():
             input=file_uri
         )
         print("File copied to clipboard", file=sys.stderr)
-        subprocess.Popen(["xdg-open", os.path.dirname(os.path.abspath(filename))])
+        subprocess.Popen(["xdg-open", os.path.abspath("transcriptions")])
     except TranscriptsDisabled:
+        logging.error("Transcripts disabled for video %s", video_id)
         print("Error: transcripts are disabled for this video.", file=sys.stderr)
         sys.exit(1)
     except NoTranscriptFound:
+        logging.error("No transcript found for video %s", video_id)
         print("Error: no transcript found for this video.", file=sys.stderr)
         sys.exit(1)
     except Exception as e:
+        logging.exception("Unexpected error for video %s — %s", video_id, e)
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
 
