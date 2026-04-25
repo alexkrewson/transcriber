@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
+import os
 import re
+import subprocess
 import sys
 from youtube_transcript_api import YouTubeTranscriptApi, NoTranscriptFound, TranscriptsDisabled
 
@@ -34,7 +36,24 @@ def fetch_transcript(video_id: str) -> str:
             transcript = next(iter(transcript_list))
 
     entries = transcript.fetch()
-    return "\n".join(f"[{format_time(entry.start)}] {entry.text.lower()}" for entry in entries)
+    lines = []
+    current_bucket = -1
+    bucket_text = []
+
+    for entry in entries:
+        bucket = int(entry.start // 30)
+        if bucket != current_bucket:
+            if bucket_text:
+                lines.append(f"[{format_time(current_bucket * 30)}] {' '.join(bucket_text)}")
+            current_bucket = bucket
+            bucket_text = [entry.text.lower()]
+        else:
+            bucket_text.append(entry.text.lower())
+
+    if bucket_text:
+        lines.append(f"[{format_time(current_bucket * 30)}] {' '.join(bucket_text)}")
+
+    return "\n".join(lines)
 
 
 def main():
@@ -53,6 +72,17 @@ def main():
     try:
         text = fetch_transcript(video_id)
         print(text)
+        filename = f"transcript_{video_id}.txt"
+        with open(filename, "w") as f:
+            f.write(text)
+        print(f"Saved to {filename}", file=sys.stderr)
+        file_uri = f"copy\nfile://{os.path.abspath(filename)}".encode()
+        subprocess.run(
+            ["xclip", "-selection", "clipboard", "-t", "x-special/gnome-copied-files"],
+            input=file_uri
+        )
+        print("File copied to clipboard", file=sys.stderr)
+        subprocess.Popen(["xdg-open", os.path.dirname(os.path.abspath(filename))])
     except TranscriptsDisabled:
         print("Error: transcripts are disabled for this video.", file=sys.stderr)
         sys.exit(1)
