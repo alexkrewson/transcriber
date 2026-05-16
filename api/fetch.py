@@ -1,9 +1,7 @@
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 from youtube_transcript_api import YouTubeTranscriptApi, NoTranscriptFound, TranscriptsDisabled
-from youtube_transcript_api.proxies import WebshareProxyConfig
 import json
-import os
 import re
 
 
@@ -25,12 +23,7 @@ def format_time(seconds: float) -> str:
 
 
 def fetch_transcript(video_id: str) -> list:
-    api = YouTubeTranscriptApi(
-        proxy_config=WebshareProxyConfig(
-            proxy_username=os.environ["WEBSHARE_PROXY_USERNAME"],
-            proxy_password=os.environ["WEBSHARE_PROXY_PASSWORD"],
-        )
-    )
+    api = YouTubeTranscriptApi()
     transcript_list = api.list(video_id)
 
     try:
