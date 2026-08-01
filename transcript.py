@@ -7,9 +7,10 @@ import sys
 from datetime import datetime
 from youtube_transcript_api import YouTubeTranscriptApi, NoTranscriptFound, TranscriptsDisabled
 
-os.makedirs("transcriptions", exist_ok=True)
+TRANSCRIPTIONS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "transcriptions")
+os.makedirs(TRANSCRIPTIONS_DIR, exist_ok=True)
 logging.basicConfig(
-    filename=os.path.join("transcriptions", "errors.log"),
+    filename=os.path.join(TRANSCRIPTIONS_DIR, "errors.log"),
     level=logging.ERROR,
     format="%(asctime)s %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
@@ -19,7 +20,7 @@ logging.basicConfig(
 def extract_video_id(url: str) -> str:
     patterns = [
         r"(?:v=|youtu\.be/)([A-Za-z0-9_-]{11})",
-        r"(?:embed/|shorts/)([A-Za-z0-9_-]{11})",
+        r"(?:embed/|shorts/|live/)([A-Za-z0-9_-]{11})",
     ]
     for pattern in patterns:
         match = re.search(pattern, url)
@@ -84,17 +85,19 @@ def main():
         text = fetch_transcript(video_id)
         print(text)
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        filename = os.path.join("transcriptions", f"transcript_{video_id}_{timestamp}.txt")
+        filename = os.path.join(TRANSCRIPTIONS_DIR, f"transcript_{video_id}_{timestamp}.txt")
         with open(filename, "w") as f:
             f.write(text)
         print(f"Saved to {filename}", file=sys.stderr)
-        file_uri = f"copy\nfile://{os.path.abspath(filename)}".encode()
-        subprocess.run(
+        file_uri = f"copy\nfile://{filename}".encode()
+        result = subprocess.run(
             ["xclip", "-selection", "clipboard", "-t", "x-special/gnome-copied-files"],
-            input=file_uri
+            input=file_uri,
+            stderr=subprocess.DEVNULL,
         )
-        print("File copied to clipboard", file=sys.stderr)
-        subprocess.Popen(["xdg-open", os.path.abspath("transcriptions")])
+        if result.returncode == 0:
+            print("File copied to clipboard", file=sys.stderr)
+        subprocess.Popen(["xdg-open", TRANSCRIPTIONS_DIR], stderr=subprocess.DEVNULL)
     except TranscriptsDisabled:
         logging.error("Transcripts disabled for video %s", video_id)
         print("Error: transcripts are disabled for this video.", file=sys.stderr)
